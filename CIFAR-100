@@ -1,0 +1,136 @@
+import numpy as np
+from tensorflow import keras
+import matplotlib.pyplot as plt
+from pylab import rcParams
+from keras.datasets import cifar100
+from keras.layers import Dense, Flatten
+from keras.layers import Conv2D, MaxPooling2D
+from tensorflow.keras import layers
+from keras.models import Sequential
+from keras.layers import Dense
+from keras.preprocessing import sequence
+from google.colab import drive
+
+drive.mount('/content/drive')
+
+# Load the data - training as well as testing
+(trainX,trainY), (testX,testY)= cifar100.load_data()
+
+# Prepare the data that can be used by the next step - creating and training the DL model
+print('Train: X=%s, Y=%s' % (trainX.shape, trainY.shape))
+print('Test: X=%s, Y=%s' % (testX.shape, testY.shape))
+train_images=trainX/255.0
+test_images=testX/255.0
+trainY = keras.utils.to_categorical(trainY, 100)
+testY = keras.utils.to_categorical(testY, 100)
+
+
+# The data from TensforFlow and Keras will only have integer class labels. Each of those 100 integer class labels correspond to the following names, in the correct order
+fine_labels = ['apple', 'aquarium_fish', 'baby', 'bear', 'beaver', 'bed', 'bee', 'beetle', 'bicycle', 'bottle', 'bowl', 'boy', 
+               'bridge', 'bus', 'butterfly', 'camel', 'can', 'castle', 'caterpillar', 'cattle', 'chair', 'chimpanzee', 'clock',
+               'cloud', 'cockroach', 'couch', 'crab', 'crocodile', 'cup', 'dinosaur', 'dolphin', 'elephant', 'flatfish', 'forest', 
+               'fox', 'girl', 'hamster', 'house', 'kangaroo', 'keyboard', 'lamp', 'lawn_mower', 'leopard', 'lion', 'lizard', 'lobster', 
+               'man', 'maple_tree', 'motorcycle', 'mountain', 'mouse', 'mushroom', 'oak_tree', 'orange', 'orchid', 'otter', 'palm_tree', 
+               'pear', 'pickup_truck', 'pine_tree', 'plain', 'plate', 'poppy', 'porcupine', 'possum', 'rabbit', 'raccoon', 'ray', 'road', 
+               'rocket', 'rose', 'sea', 'seal', 'shark', 'shrew', 'skunk', 'skyscraper', 'snail', 'snake', 'spider', 'squirrel', 'streetcar', 
+               'sunflower', 'sweet_pepper', 'table', 'tank', 'telephone', 'television', 'tiger', 'tractor', 'train', 'trout', 'tulip', 'turtle', 
+               'wardrobe', 'whale', 'willow_tree', 'wolf', 'woman', 'worm']
+
+# These are the string labels for the 20 superclasses. You may not need to use this at all, just provided here for reference.
+coarse_labels = ['aquatic_mammals', 'fish', 'flowers', 'food_containers', 'fruit_and_vegetables', 'household_electrical_devices', 'household_furniture', 
+                 'insects', 'large_carnivores', 'large_man-made_outdoor_things', 'large_natural_outdoor_scenes', 'large_omnivores_and_herbivores',
+                 'medium_mammals', 'non-insect_invertebrates', 'people', 'reptiles', 'small_mammals', 'trees', 'vehicles_1', 'vehicles_2']
+
+# Visualizes the data by plotting 100 random images, one each for the 100 classes
+# Draws 10 images in one row, 10 rows total
+l=[]
+c=[]
+id=np.random.randint(0,len(trainX),1000)
+n=trainY[id][0]
+for i in id:
+  if trainY[i] not in c:
+    c.append(trainY[i][0])
+    l.append([i][0])
+
+print(len(c))
+print(c)
+print(len(l))
+print(l)
+
+rcParams['figure.figsize'] = 10,10
+num_row = 10
+num_col = 10
+fig, axes = plt.subplots(num_row, num_col)
+imageId=l
+for i in range(0, num_row):
+    for j in range(0, num_col):
+      k = (i*num_col)+j
+      axes[i,j].imshow(trainX[imageId[k]])
+      axes[i,j].axis('off')
+      
+# Creates a DL model for Computer Vision 
+model = keras.models.Sequential([
+    keras.layers.Conv2D(64, (3,3), activation='elu', input_shape=(32, 32, 3)),
+    keras.layers.MaxPooling2D(2, 2),
+    keras.layers.Conv2D(64, (3, 3), activation='elu'),
+    keras.layers.MaxPooling2D(2, 2),
+    keras.layers.Flatten(),
+    keras.layers.Dense(512, activation='elu'),
+    keras.layers.Dense(100, activation='softmax')
+])
+
+# Prints the DL model summary
+model.summary()
+
+
+
+# Sets the model checkpoints to be saved in a folder in the google drive at at location "/content/drive/My Drive/Colab Notebooks/cifar/"
+checkpoint_path = 'content/gdrive/My Drive/Colab Notebooks/cifar'
+
+# Create a callback that saves the model's weights
+batch_size = 32
+cp_callback = keras.callbacks.ModelCheckpoint(filepath=checkpoint_path,
+                                              save_weights_only=True,
+                                              save_freq=5*batch_size)
+opt = keras.optimizers.RMSprop(learning_rate=0.01)
+
+# Train/fit the DL model using the training CIFAR-100 data
+model.compile(optimizer='RMSprop', loss='categorical_crossentropy', metrics=['accuracy'])
+history = model.fit(train_images, trainY, epochs=20 ,callbacks=[cp_callback])
+
+
+# Plot the training/validation accuracy and loss
+plt.plot(history.history['accuracy'], label='accuracy')
+plt.xlabel('Epoch')
+plt.ylabel('Accuracy')
+plt.ylim([0.5, 1])
+plt.legend(loc='lower right')
+
+
+loaded=model.load_weights(checkpoint_path)
+model.load_weights(checkpoint_path)
+loss, acc = model.evaluate(test_images, testY, verbose=2)
+print("Restored model, accuracy: {:5.2f}%".format(100 * acc))
+test_loss, test_acc = model.evaluate(test_images, testY)
+print(test_acc)
+prediction = model.predict(test_images)
+
+# Re-initialize the model
+loaded_model = keras.models.Sequential([
+    keras.layers.Conv2D(64, (3,3), activation='elu', input_shape=(32, 32, 3)),
+    keras.layers.MaxPooling2D(2, 2),
+    keras.layers.Conv2D(64, (3, 3), activation='elu'),
+    keras.layers.MaxPooling2D(2, 2),
+    keras.layers.Flatten(),
+    keras.layers.Dense(512, activation='elu'),
+    keras.layers.Dense(100, activation='softmax')
+])
+loaded_model.compile(optimizer='adam', loss='sparse_categorical_crossentropy', metrics=['accuracy'])
+
+# Load the model weights that were saved at - "/content/drive/My Drive/Colab Notebooks/cifar/"
+loaded_model.load_weights(checkpoint_path)
+
+# Evaluate the trained DL model on the CIFAR-100 test dataset
+loss, acc = loaded_model.evaluate(test_images, testY, verbose=2)
+print("Restored model, accuracy: {:5.2f}%".format(100 * acc))
+test_loss, test_acc = model.evaluate(test_images,  testY, verbose=0)
